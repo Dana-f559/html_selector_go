@@ -18,66 +18,44 @@ func main(){
 	
 	file_name := os.Args[1];
 
+	// read the file
 	file_data_string := string(read_file(file_name));
+
+	// format to html5
+	html_node_doc, err := html.Parse(strings.NewReader(file_data_string));
+
+	if err != nil {
+		fmt.Println(err)
+	}
+	
+	var buf strings.Builder;
+	err1 := html.Render(&buf, html_node_doc)
+
+	if err1 != nil {
+		fmt.Printf("Error rendering document: %v", err1)
+	}
+
+	// the doc
+	string_doc := html.UnescapeString(buf.String())
+
 	
 	// Get the input
 	reader := bufio.NewReader(os.Stdin);
 	element, _ := get_input("element: ", reader)
 
+	new := string_doc;
 	
-	// Parce the html
-
-	doc, err := html.Parse(strings.NewReader(file_data_string));
-
-	if (err != nil) {
-		panic(err);
-	}
-	new := file_data_string;
-	// elements := [2]string{"<div>","</div>"}
-	elements := find_element_html(doc,element);
+	elements := find_element_html(html_node_doc,element);
+	// fmt.Println(elements)
 	for j := 0; j < len(elements); j++ {
 		new = select_effect(new,elements[j],"\033[31m","\033[0m");
 		
-		// new = select_effect(new,elements[j],"_","_a");
-
 	}
-
 	fmt.Println(new);
-	// fmt.Println(elements)
 }
 
 func select_effect(text string, word string, effect_start string, effect_end string) string{
 	return strings.ReplaceAll(text, word, effect_start+word+effect_end);
-}
-
-
-func arrange(n *html.Node) string{
-	// Serialize the current node, including its children
-	var result string
-
-	if n.Type == html.ElementNode {
-		// Construct the opening tag with attributes
-		result += "<" + n.Data
-		for _, attr := range n.Attr {
-			result += fmt.Sprintf(" %s=\"%s\"", attr.Key, attr.Val)
-		}
-		result += ">"
-	} else if n.Type == html.TextNode {
-		// Append text content
-		result += n.Data
-	}
-
-	// Process children
-	for child := n.FirstChild; child != nil; child = child.NextSibling {
-		result += arrange(child)
-	}
-
-	// Close the tag if it's an element node
-	if n.Type == html.ElementNode {
-		result += "</" + n.Data + ">"
-	}
-
-	return result
 }
 
 func find_element_html(doc *html.Node, element string) []string {
@@ -86,9 +64,19 @@ func find_element_html(doc *html.Node, element string) []string {
 
 	var f func(*html.Node)
 	f = func(n *html.Node) {
+		
 		if n.Type == html.ElementNode && n.DataAtom.String() == element {
-			// Serialize this element and add to results
-			elements = append(elements, arrange(n));
+			
+			if n.Parent.DataAtom.String() != element{
+				var sb strings.Builder
+				err := html.Render(&sb, n)
+				if err != nil {
+					fmt.Printf("Error rendering node: %v", err)
+				}
+				
+				elements = append(elements, html.UnescapeString(sb.String()));
+			}
+			
 		}
 
 		// Recurse through the DOM tree
@@ -97,7 +85,6 @@ func find_element_html(doc *html.Node, element string) []string {
 		}
 	}
 
-	// Start processing from the root node
 	f(doc);
 
 	return elements;
